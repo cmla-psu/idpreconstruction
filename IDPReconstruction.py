@@ -291,8 +291,7 @@ if __name__ == "__main__":
     # setup initial boundaries for attacking numerical columns
     bounds = {'day': (0, 31), 'campaign': (0, 100), 'pdays': (-1, 2000), 'previous': (0, 2000),
               'age': (0, 125), 'duration': (0, 10 ** 4), 'balance': (-10 ** 5, 10 ** 6)}
-    reconstructionOrder = ['job', 'marital', 'education', 'default', 'housing', 'loan', 'contact', 'month', 'poutcome',
-                           'y', 'day', 'campaign', 'pdays', 'previous', 'age', 'duration', 'balance']
+    reconstructionOrder = ['y','default','housing','loan','marital','contact','poutcome','education','job','month','day','previous','campaign','age','pdays','duration','balance']
     attacker = LocalSensitivityReconstructionAttacker(queryAnswerer, 1, bounds, reconstructionOrder)
     attacker.individualColumnReconstructionExperiment()
     attacker.entireDatabaseReconstructionExperiment()
@@ -304,12 +303,15 @@ if __name__ == "__main__":
     print(attacker.column_only_uniques_dictionary)
     print('Queries Needed:')
     print(attacker.column_only_query_dictionary)
+    print('Total Queries Needed:')
+    print(sum(attacker.column_only_query_dictionary.values()))
     print('--------------------------------------------')
-
     print('Entire Database Reconstruction')
     print('--------------------------------------------')
     print('Unique Sequences:')
     print(attacker.total_uniques_dictionary)
     print('Queries Needed:')
     print(attacker.total_query_dictionary)
+    print('Total Queries Needed:')
+    print(sum(attacker.total_query_dictionary.values()))
     print('--------------------------------------------')
