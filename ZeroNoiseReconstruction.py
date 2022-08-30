@@ -175,6 +175,7 @@ class ZeroNoiseReconstructionAttacker:
                 for a in ReconDatabase:
                     ReconDatabase = copy.deepcopy(self.listOfLists(a))
                 CorrectedSequenceList = ReconDatabase.copy()
+                columnSet = list(map(list, set(map(tuple, ReconDatabase))))
             else:
                 CorrectedSequenceList = []
                 columnSet = list(map(list, set(map(tuple, ReconDatabase))))
