@@ -212,7 +212,6 @@ class LocalSensitivityReconstructionAttacker:
                 columnSet = list(map(list, set(map(tuple, ReconDatabase))))
 
             # print analytics
-            QueriesByColumn = self.queryAnswerer.getNumQueries()
             self.Reconstructed_df = pd.DataFrame(CorrectedSequenceList)
             print(self.Reconstructed_df)
             print('Total Queries So Far:', self.queryAnswerer.getNumQueries())
@@ -221,6 +220,7 @@ class LocalSensitivityReconstructionAttacker:
             print('Number of Unique Elements:', len(columnSet))
             self.total_uniques_dictionary[self.reconstructionOrderColumns[i]] = len(columnSet)
             print('\n')
+            QueriesByColumn = self.queryAnswerer.getNumQueries()
         self.Reconstructed_df.columns = self.categoricalColumns + self.numericalColumns
         print('-----------------Reconstructed dataframe----------------')
         print(self.Reconstructed_df)
