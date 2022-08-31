@@ -52,11 +52,9 @@ class LocalSensitivityReconstructionAttacker:
         if high >= low:
             mid = (high + low) // 2
 
-            # x = self.choose_count(U, V, mid, comparisonDict)
             x = self.queryAnswerer.count(U, V, mid, self.epsilon, colNumber, comparisonDict)
 
             if x == 0:
-                # y = self.choose_count(U, V, mid - 1, comparisonDict)
                 y = self.queryAnswerer.count(U, V, mid - 1, self.epsilon, colNumber, comparisonDict)
                 if y != 0:
                     return mid
@@ -65,7 +63,7 @@ class LocalSensitivityReconstructionAttacker:
             elif x != 1:  # x is decimal
                 # observing a decimal value bounds the search space for the true boundary
                 return self.binarySearchRightCountBoundary(U, V, mid + 1, min(high, mid + self.queryAnswerer.k + 1), colNumber, comparisonDict)
-            else:  # x is 1
+            else:  # x is 1, so count > mid, so we must shrink upwards
                 return self.binarySearchRightCountBoundary(U, V, mid + 1, high, colNumber, comparisonDict)
         else:
             return -1
@@ -80,16 +78,30 @@ class LocalSensitivityReconstructionAttacker:
         if high >= low:
             mid = (high + low) // 2
 
-            x = self.queryAnswerer.count(U, mid, currCount + self.queryAnswerer.k - 1, self.epsilon, colNumber, comparisonDict)
-            if x == 0:  # currCount-1 >= count from U to mid >= count from U to mid-increment, so we must shrink upwards
-                return self.binarySearchValueReconstruction(U, V, mid + self.precision, high, currCount, colNumber, comparisonDict)
+            if currCount + self.queryAnswerer.k - 1 < self.queryAnswerer.numRows:  # we assume we know how many rows are in the database, and this could have been previously reconstructed even if not known originally
+                x = self.queryAnswerer.count(U, mid, currCount + self.queryAnswerer.k - 1, self.epsilon, colNumber, comparisonDict)
+                if x == 0:  # we must shrink upwards
+                    return self.binarySearchValueReconstruction(U, V, mid + self.precision, high, currCount, colNumber, comparisonDict)
+                else:
+                    y = self.queryAnswerer.count(U, mid - self.precision, currCount + self.queryAnswerer.k - 1, self.epsilon, colNumber, comparisonDict)
+                    if y == 0:
+                        elementCount = self.reconstructCount(U, mid - self.precision, currCount, colNumber, comparisonDict)
+                        return mid - self.precision, elementCount
+                    else:  # we must shrink downwards
+                        return self.binarySearchValueReconstruction(U, V, low, mid, currCount, colNumber, comparisonDict)
+            # normally, we search for an upper boundary, but need to adapt when currCount is too high for that boundary to occur
             else:
-                y = self.queryAnswerer.count(U, mid - self.precision, currCount + self.queryAnswerer.k - 1, self.epsilon, colNumber, comparisonDict)
-                if y == 0:
-                    elementCount = self.reconstructCount(U, mid - self.precision, currCount, colNumber, comparisonDict)
-                    return mid - self.precision, elementCount
-                else:  # currCount-1 < count from U to mid-increment, <= count from U to mid, so we must shrink downwards
-                    return self.binarySearchValueReconstruction(U, V, low, mid, currCount, colNumber, comparisonDict)
+                # shorter range query, which should be 1 when its count is DSize, then when it's decimal or 0, we check the larger range.
+                y = self.queryAnswerer.count(U, mid - self.precision, currCount - self.queryAnswerer.k - 1, self.epsilon, colNumber, comparisonDict)
+                if y == 1:  # true count must be numRows, so we need to shrink downwards
+                    return self.binarySearchValueReconstruction(U, V, low, mid - self.precision, currCount, colNumber, comparisonDict)
+                else:  # true count is less than numRows, whether y = 0 or a noisy value
+                    x = self.queryAnswerer.count(U, mid, currCount - self.queryAnswerer.k - 1, self.epsilon, colNumber, comparisonDict)
+                    if x == 1:  # true count must be numRows, which means we have reconstructed the value
+                        elementCount = self.reconstructCount(U, mid - self.precision, currCount, colNumber, comparisonDict)
+                        return mid - self.precision, elementCount
+                    else:  # true count is less than numRows, so the element found is not the next smallest, so we must shrink upwards
+                        return self.binarySearchValueReconstruction(U, V, mid + self.precision, high, currCount, colNumber, comparisonDict)
         else:
             return -1, 0
 
@@ -99,12 +111,10 @@ class LocalSensitivityReconstructionAttacker:
             mid = (high + low) // 2
 
             x = self.queryAnswerer.count(U, mid, self.queryAnswerer.k, self.epsilon, colNumber, comparisonDict)
-            # x = self.choose_count(U, mid, 1 + self.queryAnswerer.k - 1, comparisonDict)
             if x == 0:  # currCount-1 >= count from U to mid >= count from U to mid-increment, so we must shrink upwards
                 return self.binarySearchValueReconstructionSingleElement(U, mid + self.precision, high, colNumber, comparisonDict)
             else:
                 y = self.queryAnswerer.count(U, mid - self.precision, self.queryAnswerer.k, self.epsilon, colNumber, comparisonDict)
-                # y = self.choose_count(U, mid - self.precision, 1 + self.queryAnswerer.k - 1, comparisonDict)
                 if y == 0:  # currCount-1 < count from U to mid-increment, <= count from U to mid, so we must shrink downwards
                     return mid - self.precision
                 else:
@@ -112,7 +122,7 @@ class LocalSensitivityReconstructionAttacker:
         else:
             return -1
 
-    # reconstruct all of the values in the given column that have the given values in the preceding columns in the given comparison list
+    # reconstruct all the values in the given column that have the given values in the preceding columns in the given comparison list
     def reconstructValueSet(self, minn, maxx, elementCount, colNumber, comparisonList):
         U, V = minn - 1, maxx + 1
         ReconstructedDatabase = []
@@ -293,10 +303,12 @@ if __name__ == "__main__":
     bounds = {'day': (0, 31), 'campaign': (0, 100), 'pdays': (-1, 2000), 'previous': (0, 2000),
               'age': (0, 125), 'duration': (0, 10 ** 4), 'balance': (-10 ** 5, 10 ** 6)}
     reconstructionOrder = ['y','default','housing','loan','marital','contact','poutcome','education','job','month','day','previous','campaign','age','pdays','duration','balance']
+    # reconstructionOrder = ['age', 'y', 'default', 'housing', 'loan', 'marital', 'contact', 'poutcome', 'education', 'job',
+    #                        'month', 'day', 'previous', 'campaign', 'pdays', 'duration', 'balance']
     attacker = LocalSensitivityReconstructionAttacker(queryAnswerer, 1, bounds, reconstructionOrder)
     attacker.individualColumnReconstructionExperiment()
-    attacker.entireDatabaseReconstructionExperiment()
-    attacker.targetingExperiment()
+    # attacker.entireDatabaseReconstructionExperiment()
+    # attacker.targetingExperiment()
     print('--------------------------------------------')
     print('Column Reconstruction')
     print('--------------------------------------------')

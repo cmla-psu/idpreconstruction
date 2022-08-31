@@ -44,6 +44,12 @@ class ProtectedDataset:
         # u, v, and column are separate from the comparisons purely for purposes of optimizing the speed of the answering based on the experiment
         # they would likely be lumped into the comparisons dictionary in a real thing
 
+        # handle simple cases up front
+        if b >= self.numRows:
+            return 0
+        if b < 0:
+            return 1
+
         self.queriesAnswered += 1
         count = 0
 
@@ -69,8 +75,6 @@ class ProtectedDataset:
                 for row in self.__cat_df_list_T:
                     # check if the values in the given columns are within the prescribed boundaries
                     if functools.reduce(lambda x, y: x and y, map(lambda z: z[1][0] <= row[z[0]] < z[1][1], comparisonDict.items()), True):
-                    # for item in comparisonDict.items():
-                    #     if item[1][0] <= row[item[0]] < item[1][1]:
                         self.__tempDataSubset.append(row)
             # compute the number of elements in the comparison subset that match the parameters for the "main" column
             for row in self.__tempDataSubset:
@@ -78,12 +82,12 @@ class ProtectedDataset:
                     count += 1
 
         # bounding to account for it being impossible to construct neighboring databases with negative rows or more rows than the size of the database
-        LowerNoiseBound = max(count - 1, 0)
-        UpperNoiseBound = min(count, self.numRows)
+        LowerNoiseBound = max(count - self.k, 0)
+        UpperNoiseBound = min(count + self.k, self.numRows)
 
         if b < LowerNoiseBound:
             return 1
-        elif b > UpperNoiseBound:
+        elif b >= UpperNoiseBound:
             return 0
         else:
             if b > len(self.__columnSubset):
