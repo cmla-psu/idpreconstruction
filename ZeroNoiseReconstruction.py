@@ -136,20 +136,28 @@ class ZeroNoiseReconstructionAttacker:
 
             df = pd.DataFrame(ReconDatabase)
             new_set = set(self.Reconstructed_column_df_dict[self.reconstructionOrderColumns[i]])
-
+            print('######################## Reconstructed Column ############################')
+            print('Column Name:',self.reconstructionOrderColumns[i])
             print(df)
-            print('Total Queries So Far:', self.queryAnswerer.getNumQueries(), self.reconstructionOrderColumns[i])
-            print('Total Queries for column:', self.queryAnswerer.getNumQueries() - QueriesByColumn, i)
-            print('Number of Unique Elements:', len(new_set))
-            print('\n\n')
+            print('-------------Query Statistics-------------')
+            print('Total Queries Used So Far:', self.queryAnswerer.getNumQueries())
+            print('Total Queries Needed for column:', self.queryAnswerer.getNumQueries() - QueriesByColumn)
+            print('Number of Unique Elements in Column:', len(new_set))
+            print('##########################################################################')
+            print('\n')
 
             self.column_only_query_dictionary[self.reconstructionOrderColumns[i]] = self.queryAnswerer.getNumQueries() - QueriesByColumn
             self.column_only_uniques_dictionary[self.reconstructionOrderColumns[i]] = len(new_set)
 
             QueriesByColumn = self.queryAnswerer.getNumQueries()
 
-        print('-----------------Column Reconstructed dataframe----------------')
+        print('######################## Column Reconstructed Dataframe ############################')
         print(pd.DataFrame(self.Reconstructed_column_df_dict))
+        print('-------------Query Statistics-------------')
+        print('Total Queries Used For Reconstruction:', sum(self.column_only_query_dictionary.values()))
+        print('Total Unique Elements Reoconstructed:', sum(self.column_only_uniques_dictionary.values()))
+        print('##########################################################################\n')
+
 
     def entireDatabaseReconstructionExperiment(self):
         self.queryAnswerer.resetQueryCounter()
@@ -202,17 +210,26 @@ class ZeroNoiseReconstructionAttacker:
 
             # print analytics
             self.Reconstructed_df = pd.DataFrame(CorrectedSequenceList)
+            print('######################## Reconstructed Database So Far ############################')
             print(self.Reconstructed_df)
-            print('Total Queries So Far:', self.queryAnswerer.getNumQueries())
-            print('Total Queries for column:', self.queryAnswerer.getNumQueries() - QueriesByColumn)
+            print('-------------Query Statistics-------------')
+            print('Total Queries Used So Far:', self.queryAnswerer.getNumQueries())
+            print('Total Queries Needed for Current column:', self.queryAnswerer.getNumQueries() - QueriesByColumn)
             self.total_query_dictionary[self.reconstructionOrderColumns[i]] = self.queryAnswerer.getNumQueries() - QueriesByColumn
-            print('Number of Unique Elements:', len(columnSet))
-            self.total_uniques_dictionary[self.reconstructionOrderColumns[i]] = len(columnSet)
+            print('Number of Unique Sequences:', len(columnSet))
+            print('##########################################################################')
             print('\n')
+
+            self.total_uniques_dictionary[self.reconstructionOrderColumns[i]] = len(columnSet)
             QueriesByColumn = self.queryAnswerer.getNumQueries()
-        self.Reconstructed_df.columns = self.categoricalColumns + self.numericalColumns
-        print('-----------------Reconstructed dataframe----------------')
+        self.Reconstructed_df.columns = self.reconstructionOrderColumns
+        print('######################## Reconstructed Dataframe ############################')
         print(self.Reconstructed_df)
+        print('-------------Query Statistics-------------')
+        print('Total Queries Used For Reconstruction:', sum(self.total_query_dictionary.values()))
+        print('Total Unique Sequences Reoconstructed:', sum(self.total_uniques_dictionary.values()))
+        print('##########################################################################\n')
+
 
     def targetingExperiment(self):
         linkingColumns = ["age", "marital", "education", "job", "housing"]
@@ -290,19 +307,19 @@ if __name__ == "__main__":
     print('--------------------------------------------')
     print('Column Reconstruction')
     print('--------------------------------------------')
-    print('Unique Elements:')
+    print('\nUnique Elements:')
     print(attacker.column_only_uniques_dictionary)
-    print('Queries Needed:')
+    print('\nQueries Needed:')
     print(attacker.column_only_query_dictionary)
-    print('Total Queries Needed:')
+    print('\nTotal Queries Needed:')
     print(sum(attacker.column_only_query_dictionary.values()))
     print('--------------------------------------------')
     print('Entire Database Reconstruction')
     print('--------------------------------------------')
-    print('Unique Sequences:')
+    print('\nUnique Sequences:')
     print(attacker.total_uniques_dictionary)
-    print('Queries Needed:')
+    print('\nQueries Needed:')
     print(attacker.total_query_dictionary)
-    print('Total Queries Needed:')
+    print('\nTotal Queries Needed:')
     print(sum(attacker.total_query_dictionary.values()))
     print('--------------------------------------------')
