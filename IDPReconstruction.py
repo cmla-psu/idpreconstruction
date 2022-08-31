@@ -307,8 +307,8 @@ if __name__ == "__main__":
     #                        'month', 'day', 'previous', 'campaign', 'pdays', 'duration', 'balance']
     attacker = LocalSensitivityReconstructionAttacker(queryAnswerer, 1, bounds, reconstructionOrder)
     attacker.individualColumnReconstructionExperiment()
-    # attacker.entireDatabaseReconstructionExperiment()
-    # attacker.targetingExperiment()
+    attacker.entireDatabaseReconstructionExperiment()
+    attacker.targetingExperiment()
     print('--------------------------------------------')
     print('Column Reconstruction')
     print('--------------------------------------------')
