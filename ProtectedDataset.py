@@ -5,7 +5,14 @@ import copy
 
 
 class ProtectedDataset:
-
+    """
+    ProtectedDataset answers count queries on the given dataset based on the group-k laplace mechanism.
+        The constructor takes:
+    :param file_name: string filename of the dataset to answer queries on
+    :param k: int value of k to use for group-k differential privacy
+    :param categoricalColumns: List containing [string column name] of categorical columns that must be converted to a numerical representation
+    :param numericalColumns: List containing [string column name] of numerical columns
+    """
     def __init__(self, file_name, k, categoricalColumns, numericalColumns):
         self.queriesAnswered = 0
         self.__df = pd.read_csv(file_name, sep=';')
@@ -35,12 +42,27 @@ class ProtectedDataset:
         # print(self.__df)
         # print(self.__cat_df)
 
-    # adds noise from the laplace distribution to the given answer
     def laplaceMechanism(self, x, epsilon):
+        """
+        Adds noise from the Laplace distribution to the given value
+        :param x: float value to add noise to
+        :param epsilon: float scale of noise to be added
+        :return: noisy value
+        """
         return x + np.random.laplace(0, 1.0 / epsilon, 1)[0]
 
-    # models the data custodian's answer to the given count query
     def count(self, u, v, b, epsilon, column, comparisonDict=None):
+        """
+        Models the data custodian's response to the count query
+        :param u: float u
+        :param v: float v
+        :param b: int b
+        :param epsilon: float privacy budget to spend on this response
+        :param column: int main column number being answered on
+        :param comparisonDict: Dictionary containing {key=string column name : value=(float u, float v) }
+            for conditioning on previous columns
+        :return:
+        """
         # u, v, and column are separate from the comparisons purely for purposes of optimizing the speed of the answering based on the experiment
         # they would likely be lumped into the comparisons dictionary in a real thing
 
@@ -98,6 +120,10 @@ class ProtectedDataset:
                 return Answer
 
     def convertCategoricalToNumbering(self):
+        """
+        Converts categorical values to a numerical schema representation
+        :return: DataFrame with numerical representation of categorical values
+        """
         cat_df = pd.DataFrame()
         for column in self.categoricalColumns:
             cat_df[column] = pd.Categorical(self.__df[column]).codes
@@ -106,16 +132,31 @@ class ProtectedDataset:
         return cat_df
 
     def getNumQueries(self):
+        """
+        :return: number of queries that have been answered so far
+        """
         return self.queriesAnswered
 
     def resetQueryCounter(self):
+        """
+        Resets the counter for number of queries answered
+            (for use between experiments)
+        :return: None
+        """
         self.queriesAnswered = 0
 
     def getColumns(self):
+        """
+        :return: List containing [string column name] column names of the protected dataset
+        """
         return self._cat_df.columns.tolist()
 
-    # return the maximum and minimum in the categorical schema for the given column
     def getCategoricalBounds(self, column):
+        """
+        Gives the bounds for the numerical schema for the given categorical column
+        :param column: string column name
+        :return: Tuple containing (int lower bound, int upper bound)
+        """
         if column in self.categoricalColumns:
             index = self.columns.index(column)
             return min(self.__cat_df_list[index]), max(self.__cat_df_list[index])

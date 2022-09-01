@@ -8,10 +8,17 @@ import copy
 from UnprotectedDataset import UnprotectedDataset
 
 class ZeroNoiseReconstructionAttacker:
-
-    def __init__(self, protectedDataset, precision, bounds, reconstructionOrder):
+    """
+    LocalSensitivityReconstructionAttacker runs experiments to reconstruct a protected dataset based on results of
+        the binary count query. The constructor takes:
+    :param unprotectedDataset: UnprotectedDataset that answers count queries honestly
+    :param precision: Float that represents the level of precision each element will be reconstructed to
+    :param bounds: Dictionary containing {key=string column name : value=(float lower bound, float upper bound) }
+    :param reconstructionOrder: List containing [string of column name] representing the order by which to reconstruct columns
+    """
+    def __init__(self, unprotectedDataset, precision, bounds, reconstructionOrder):
         # set up access to and known information about protected dataset
-        self.queryAnswerer = protectedDataset
+        self.queryAnswerer = unprotectedDataset
         self.categoricalColumns = queryAnswerer.categoricalColumns
         self.numericalColumns = queryAnswerer.numericalColumns
         self.reconstructionOrderColumns = reconstructionOrder
@@ -30,20 +37,38 @@ class ZeroNoiseReconstructionAttacker:
         self.column_only_query_dictionary = {}
         self.total_query_dictionary = {}
 
-    def laplaceMechanism(self, x):
-        x += np.random.laplace(0, 1.0 / self.epsilon, 1)[0]
-        return x
-
     @staticmethod
-    def putElementsIntoDatabase(Element, Database, Count):
-        for i in range(0, Count):
-            Database.append(Element)
+    def putElementsIntoDatabase(element, database, count):
+        """
+        Helper method to insert a given number of elements into a list.
+        :param element: The element to insert into the database
+        :param database: List to insert the given element into
+        :param count: Number of times to insert the given element into the list
+        """
+        for i in range(0, count):
+            database.append(element)
 
     @staticmethod
     def listOfLists(lst):
+        """
+        Helper method to create a list of lists out of the elements from the given list.
+        :param lst: List to create a list of lists out of
+        """
         return list(map(lambda el: [el], lst))
 
     def binarySearchRightCountBoundary(self, U, V, low, high, colNumber, comparisonDict):
+        """
+        Binary search to find the upper side of the boundary between decimal and binary responses to the count query
+            with varied values of b.
+        :param U: float to pass as u to the count query
+        :param V: float to pass as v to the count query
+        :param low: int lower boundary of the binary search
+        :param high: int upper boundary of the binary search
+        :param colNumber: int column number being reconstructed
+        :param comparisonDict: Dictionary containing {key=string column name : value=(float u, float v) }
+            for conditioning on previous columns
+        :return: int count that represents the upper side of the decimal-binary boundary
+        """
         # Check base case
         if high >= low:
 
@@ -63,9 +88,31 @@ class ZeroNoiseReconstructionAttacker:
             return -2
 
     def reconstructCount(self, U, V, countLimit, colNumber, comparisonDict):
+        """
+        Reconstructs the number of elements in a given range
+        :param U: float u in the count query
+        :param V: float v in the count query
+        :param countLimit: int known initialize upper limit of the count
+        :param colNumber: int column number being reconstructed
+        :param comparisonDict: Dictionary containing {key=string column name : value=(float u, float v) }
+            for conditioning on previous columns
+        :return: int the count of elements in the range [U, V)
+        """
         return self.binarySearchRightCountBoundary(U, V, 0, countLimit, colNumber, comparisonDict)
 
     def binarySearchValueReconstruction(self, U, V, low, high, currCount, colNumber, comparisonDict):
+        """
+        Finds the next largest value in the given column and the count of remaining elements to reconstruct
+        :param U: float u to be passed to the count query
+        :param V: float v unused
+        :param low: float the lower boundary of the binary search
+        :param high: float the upper boundary of the binary search
+        :param currCount: int the remaining number of elements in the column to be reconstructed
+        :param colNumber: int column number being reconstructed
+        :param comparisonDict: Dictionary containing {key=string column name : value=(float u, float v) }
+            for conditioning on previous columns
+        :return: (value, count) representing the next largest value to reconstruct and the count of elements in the range up to, but excluding count
+        """
         if high >= low:
             mid = (high + low) // 2
 
@@ -84,6 +131,16 @@ class ZeroNoiseReconstructionAttacker:
             return -1, 0
 
     def reconstructValueSet(self, minn, maxx, elementCount, colNumber, comparisonDict):
+        """
+        Reconstructs all the values in the given column that fit the preconditions in the given comparisonList
+        :param minn: float the lower boundary for the values in the given column
+        :param maxx: float the upper boundary for the values in the given column
+        :param elementCount: int the number of elements known to fit the preconditions
+        :param colNumber: int the column number being reconstructed
+        :param comparisonDict: Dictionary containing {key=string column name : value=(float u, float v) }
+            for conditioning on previous columns
+        :return: Reconstructed dataset for the given column and preconditions
+        """
         U, V = minn - 1, maxx + 1
         ReconstructedDatabase = []
         currCount = elementCount
@@ -98,11 +155,21 @@ class ZeroNoiseReconstructionAttacker:
         return ReconstructedDatabase
 
     def binarySearchValueReconstructionSingleElement(self, U, low, high, colNumber, comparisonDict):
+        """
+        Reconstructs the element in the column while assuming that there is only one such element that fits the preconditions
+            (used specifically for the targeting experiment)
+        :param U: float u to pass to the count query
+        :param low: float the lower bound of the binary search
+        :param high: float the upper bound of the binary search
+        :param colNumber: int the column number being reconstructed
+        :param comparisonDict: Dictionary containing {key=string column name : value=(float u, float v) }
+            for conditioning on previous columns
+        :return: the element fitting the preconditions in the given column
+        """
         if high >= low:
             mid = (high + low) // 2
 
             x = self.queryAnswerer.count(U, mid, 0, colNumber, comparisonDict)
-            # Count2D(Database, U, mid, currCount-1, DSize, comparisonList)
             if x == 0:  # currCount-1 >= count from U to mid >= count from U to mid-increment, so we must shrink upwards
                 return self.binarySearchValueReconstructionSingleElement(U, mid + self.precision, high, colNumber, comparisonDict)
             else:
@@ -115,6 +182,10 @@ class ZeroNoiseReconstructionAttacker:
             return 0
 
     def individualColumnReconstructionExperiment(self):
+        """
+        Conducts an experiment for reconstructing each individual column
+        :return: None
+        """
         self.queryAnswerer.resetQueryCounter()
         QueriesByColumn = 0
         maxx = np.Infinity
@@ -160,6 +231,10 @@ class ZeroNoiseReconstructionAttacker:
 
 
     def entireDatabaseReconstructionExperiment(self):
+        """
+        Conducts an experiment to reconstruct the entire database
+        :return: None
+        """
         self.queryAnswerer.resetQueryCounter()
         minn, maxx = np.Infinity, np.Infinity
         QueriesByColumn = 0
@@ -230,8 +305,11 @@ class ZeroNoiseReconstructionAttacker:
         print('Total Unique Sequences Reoconstructed:', sum(self.total_uniques_dictionary.values()))
         print('##########################################################################\n')
 
-
     def targetingExperiment(self):
+        """
+        Conducts an experiment that targets users known to be a unique combinations of specified linking columns
+        :return: None
+        """
         linkingColumns = ["age", "marital", "education", "job", "housing"]
         cols = self.reconstructionOrderColumns.copy()
         for col in linkingColumns:
@@ -294,7 +372,7 @@ class ZeroNoiseReconstructionAttacker:
 if __name__ == "__main__":
     categoricalColumns = ['job', 'marital', 'education', 'default', 'housing', 'loan', 'contact', 'month', 'poutcome', 'y']
     numericalColumns = ['day', 'campaign', 'pdays', 'previous', 'age', 'duration', 'balance']
-    queryAnswerer = UnprotectedDataset('bank-full.csv', 1, categoricalColumns, numericalColumns)
+    queryAnswerer = UnprotectedDataset('bank-full.csv', categoricalColumns, numericalColumns)
 
     # setup initial boundaries for attacking numerical columns
     bounds = {'day': (0, 31), 'campaign': (0, 100), 'pdays': (-1, 2000), 'previous': (0, 2000),

@@ -5,8 +5,14 @@ import copy
 
 
 class UnprotectedDataset:
+    """
+    ProtectedDataset answers count queries on the given dataset honestly. The constructor takes:
+    :param file_name: string filename of the dataset to answer queries on
+    :param categoricalColumns: List containing [string column name] of categorical columns that must be converted to a numerical representation
+    :param numericalColumns: List containing [string column name] of numerical columns
+    """
 
-    def __init__(self, file_name, k, categoricalColumns, numericalColumns):
+    def __init__(self, file_name, categoricalColumns, numericalColumns):
         self.queriesAnswered = 0
         self.__df = pd.read_csv(file_name, sep=';')
 
@@ -16,7 +22,6 @@ class UnprotectedDataset:
         self.__cat_df_list = np.array(self._cat_df).T.tolist()
         self.__cat_df_list_T = np.array(self._cat_df).tolist()
         self.columns = self._cat_df.columns.tolist()
-        self.k = k
         self.numRows = self.__df.shape[0]
         self.numColumns = self.__df.shape[1]
 
@@ -35,6 +40,16 @@ class UnprotectedDataset:
 
     # models the data custodian's answer to the given count query
     def count(self, u, v, b, column, comparisonDict=None):
+        """
+        Models the data custodian's response to the count query
+        :param u: float u
+        :param v: float v
+        :param b: int b
+        :param column: int main column number being answered on
+        :param comparisonDict: Dictionary containing {key=string column name : value=(float u, float v) }
+            for conditioning on previous columns
+        :return:
+        """
         # u, v, and column are separate from the comparisons purely for purposes of optimizing the speed of the answering based on the experiment
         # they would likely be lumped into the comparisons dictionary in a real thing
 
@@ -47,8 +62,6 @@ class UnprotectedDataset:
         # (otherwise, used already constructed subset)
         # This check and storage of the database subset is quality-of-life to speed up the experiment's runtime,
         # but likely would not exist in a real query-answering mechanism
-        # if (self.__u != u) or (self.__v != v) or (self.__colIndex != column) or (not self.__comparisonsV3 == comparisons):
-        # self.__columnSubset = []
         self.__colIndex = column
 
         if comparisonDict is None:  # single column, can ignore the comparisons to previous columns
@@ -77,6 +90,10 @@ class UnprotectedDataset:
             return 0
 
     def convertCategoricalToNumbering(self):
+        """
+        Converts categorical values to a numerical schema representation
+        :return: DataFrame with numerical representation of categorical values
+        """
         cat_df = pd.DataFrame()
         for column in self.categoricalColumns:
             cat_df[column] = pd.Categorical(self.__df[column]).codes
@@ -85,16 +102,32 @@ class UnprotectedDataset:
         return cat_df
 
     def getNumQueries(self):
+        """
+        :return: number of queries that have been answered so far
+        """
         return self.queriesAnswered
 
     def resetQueryCounter(self):
+        """
+        Resets the counter for number of queries answered
+            (for use between experiments)
+        :return: None
+        """
         self.queriesAnswered = 0
 
     def getColumns(self):
+        """
+        :return: List containing [string column name] column names of the protected dataset
+        """
         return self._cat_df.columns.tolist()
 
     # return the maximum and minimum in the categorical schema for the given column
     def getCategoricalBounds(self, column):
+        """
+        Gives the bounds for the numerical schema for the given categorical column
+        :param column: string column name
+        :return: Tuple containing (int lower bound, int upper bound)
+        """
         if column in self.categoricalColumns:
             index = self.columns.index(column)
             return min(self.__cat_df_list[index]), max(self.__cat_df_list[index])
